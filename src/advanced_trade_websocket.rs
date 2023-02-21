@@ -1,4 +1,4 @@
-use crate::{advanced_trade_rest_client::AdvancedTradeRESTClient, models, websocket, sig_gen};
+use crate::{advanced_trade_rest_client::AdvancedTradeRESTClient, config_builder::CoinbaseConfig, models, websocket, sig_gen};
 use anyhow::{bail, Result};
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
@@ -38,16 +38,16 @@ impl AdvancedTradeWebSockets {
     pub fn new(
         channels: Vec<String>, 
         product_ids: SubscribeProducts, 
-        key: String, 
-        secret: String
     ) -> AdvancedTradeWebSockets {
+        let config = CoinbaseConfig::new();
+
         AdvancedTradeWebSockets {
             exchange: "coinbase-advanced-trade".to_string(),
             channels,
             product_ids,
-            client: AdvancedTradeRESTClient::new("https://api.coinbase.com/api/v3", key, secret),
-            key,
-            secret,  // need to fix this i did it wrong
+            client: AdvancedTradeRESTClient::new("https://api.coinbase.com/api/v3"),
+            key: config.api_key,
+            secret: config.api_secret,
         }
     }
 
