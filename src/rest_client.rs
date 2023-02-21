@@ -1,18 +1,14 @@
-use crate::{sig_gen::create_rest_signature};
-
 use anyhow::{bail, Result};
-use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::header::HeaderMap;
 use reqwest::{Response, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use std::fmt;
-use std::time::{SystemTime, UNIX_EPOCH};
 
+/// Generic REST API Client
 pub struct Client {
     host: String,
     inner_client: reqwest::Client,
-    key: String,
-    secret: String,
 }
 
 /* 
@@ -24,18 +20,22 @@ TODO: Abstract out the key / secret parameters. this should sit at the AdvancedT
             used to handle headers that are generated in the AdvancedTrade scope
 */
 impl Client {
-    pub fn new(host: String, key: String, secret: String) -> Self {
+    /// Implements a new function for the REST API Client with a host and inner client
+    /// `inner_client` is automatically constructed with the `reqwest` library using `reqwest::Client::builder()`
+    pub fn new(host: String) -> Self {
         Client {
             host,
             inner_client: reqwest::Client::builder()
                 .pool_idle_timeout(None)
                 .build()
                 .unwrap(),
-            key,
-            secret,
         }
     }
 
+    /// Implemention of a response handler function.
+    /// Matches to the following set of expected responses: `StatusCode::OK`, `StatusCode::INTERNAL_SERVER_ERROR`,
+    /// `StatusCode::SERVICE_UNAVAILABLE`, `StatusCode::UNAUTHORIZED`, `StatusCode::BAD_REQUEST`
+    /// Defaults to a `bail!` with relevant response message for uncovered StatusCodes.
     async fn handler<T: DeserializeOwned>(&self, response: Response) -> Result<T> {
         match response.status() {
             StatusCode::OK => Ok(response.json::<T>().await?),
@@ -58,72 +58,47 @@ impl Client {
         }
     }
 
-    fn extract_request_path(&self) -> Option<&str> {
+    /// Extracts the request path from the `host` parameter
+    /// 
+    /// Utilizes string search for `".com"` within the `host` parameter and returns the string to the 
+    /// right of the `".com"` index
+    /// 
+    /// # Returns
+    /// 
+    /// `Option<&str>` - which is the optional reference to the string described after `".com"`
+    /// 
+    /// # Example
+    /// 
+    /// TODO: Insert an example here
+    pub fn extract_request_path(&self) -> Option<&str> {
         let idx = self.host.find(".com").unwrap() + ".com".len();
         Some(&self.host[idx..])
     }
 
-    fn build_headers(&self, rmethod: &str, rpath: &str, rbody: &str) -> Result<HeaderMap> {
-        // signature creation
-        let rts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs().to_string();
-        let signature = create_rest_signature(
-            rts.as_str(), 
-            rmethod, 
-            rpath, 
-            rbody, 
-            self.secret.as_bytes());
-        let sign = signature.as_str();
-        
-        // build out request headers
-        let mut custom_headers = HeaderMap::new(); 
-
-        custom_headers.insert("CB-ACCESS-KEY", HeaderValue::from_str(self.key.as_str()).unwrap());
-        custom_headers.insert("CB-ACCESS-SIGN", HeaderValue::from_str(sign).unwrap());
-        custom_headers.insert("CB-ACCESS-TIMESTAMP", HeaderValue::from_str(rts.as_str()).unwrap());
-
-        Ok(custom_headers)
-    }
-
-    pub async fn get<T: DeserializeOwned>(&self, endpoint: &str, request: Option<String>) -> Result<T> {
+    pub async fn get<T: DeserializeOwned>(&self, endpoint: &str, headers: HeaderMap, request: Option<String>) -> Result<T> {
         let mut url: String = format!("{}{}", self.host, endpoint);
-        if let Some(request) = request {
+        if let Some(request) = request {  // handle request payload if necessary
             if !request.is_empty() {
                 url.push_str(format!("?{}", request).as_str());
             }
         }
 
-        let request_path = format!("{}{}", self.extract_request_path().unwrap(), endpoint); 
-
-        /*
-        Possible implementation of boolean header flag is by using an...
-        if let Some(boolean_flag: bool) = boolean_flag {
-            if boolean_flag {
-                // generate get with headers
-            } else {
-                // generate get without headers
-            }
-        } 
-        */
-        
         let client = &self.inner_client;
         let response = client
             .get(url.as_str())
-            .headers(self.build_headers("GET", request_path.as_str(), "")?)
+            .headers(headers)
             .send()
             .await?;
 
         self.handler(response).await
     }
 
-    pub async fn post<T: DeserializeOwned>(&self, endpoint: &str) -> Result<T> {
+    pub async fn post<T: DeserializeOwned>(&self, endpoint: &str, headers: HeaderMap) -> Result<T> {
         let url: String = format!("{}{}", self.host, endpoint);
-
-        let request_path = format!("{}{}", self.extract_request_path().unwrap(), endpoint); 
-
         let client = &self.inner_client;
         let response = client
             .post(url.as_str())
-            .headers(self.build_headers("POST", request_path.as_str(), "")?)
+            .headers(headers)
             .send()
             .await?;
 

@@ -1,3 +1,4 @@
+use dotenv::dotenv;
 use std::env;
 
 pub struct CoinbaseConfig {
@@ -7,6 +8,7 @@ pub struct CoinbaseConfig {
 
 impl CoinbaseConfig {
     pub fn new() -> Self {
+        dotenv().ok();
         CoinbaseConfig {
             api_key: env::var("COINBASE_API_KEY").expect("Failed to set config"),
             api_secret: env::var("COINBASE_API_SECRET").expect("Failed to set config"),
