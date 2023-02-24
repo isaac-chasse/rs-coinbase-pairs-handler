@@ -93,6 +93,7 @@ impl Client {
         self.handler(response).await
     }
 
+    #[allow(dead_code)]
     pub async fn post<T: DeserializeOwned>(&self, endpoint: &str, headers: HeaderMap) -> Result<T> {
         let url: String = format!("{}{}", self.host, endpoint);
         let client = &self.inner_client;
