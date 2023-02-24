@@ -8,9 +8,9 @@
         "ETH-USD"
         ], 
     "channel": "ticker", 
-    "api_key": "KaHjgMpnvTV8rl1r", 
+    "api_key": "...", 
     "timestamp": "1675836190", 
-    "signature": "3a576f746dfd8d4c52c890095ae2ec7880b807bc8062ae87c020e88ddbbfad7e"
+    "signature": "..."
 }
 ```
 
