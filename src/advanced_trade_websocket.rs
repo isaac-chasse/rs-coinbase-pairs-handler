@@ -74,13 +74,14 @@ impl AdvancedTradeWebSockets {
             }
         };
 
+        self.subscribe_to_channel(&mut socket.0).await;
+
         // engage event loop
         info!("Starting event loop...");
         while running.load(Ordering::Relaxed) {
             // get messages
             let message = match socket.0.read_message() {
                 Ok(msg) => {
-                    debug!("{:?}", msg);
                     msg
                 },
                 Err(e) => {
@@ -123,9 +124,9 @@ impl AdvancedTradeWebSockets {
     async fn handle_msg(
         &self, 
         msg: &str, 
-        socket: &mut WebSocket<MaybeTlsStream<TcpStream>>
+        _socket: &mut WebSocket<MaybeTlsStream<TcpStream>>
     ) -> Result<()> {
-        let mut advanced_trade_event: AdvancedTradeEvents = match serde_json::from_str(msg) {
+        let advanced_trade_event: AdvancedTradeEvents = match serde_json::from_str(msg) {
             Ok(deserialized_event) => deserialized_event,
             Err(e) => {
                 error!("Error unpacking advanced trade websocket event: {:?}", e);
@@ -136,12 +137,30 @@ impl AdvancedTradeWebSockets {
         match advanced_trade_event {
             AdvancedTradeEvents::GenericEvent(event) => {
                 info!("{:?}", event);
+
+                // ideally I'd like to display the different event types differently
+                // I might want to abstract this code out into a message handler
+                // or even create and impl block to handle the different event structs
+                // match &event.events[0] {
+                //     models::WebsocketEvent::SubscriptionEvent(subscription) => {
+                //         info!("{:?}", subscription);
+                //     },
+                //     models::WebsocketEvent::SnapshotEvent(snapshot) => {
+                //         info!("{:?}", snapshot);
+                //     },
+                //     models::WebsocketEvent::UpdateEvent(update) => {
+                //         info!("{:?}", update);
+                //     },
+                //     models::WebsocketEvent::Unkown => {
+                //         info!("Recieved unknown event");
+                //     }
+                // }
             },
             AdvancedTradeEvents::ErrorEvent(event) => {
                 error!("Error message encountered: {:?}", event);
             },
             AdvancedTradeEvents::Unknown => {
-                debug!("Unknown event encounteres")
+                debug!("Unknown event encountered")
             }
 
         }
@@ -164,7 +183,7 @@ impl AdvancedTradeWebSockets {
         while let Some(channel) = current_channel.clone() {
             for product in &products {
                 if socket.can_write() {
-                    let subscribe_channel = format!("{}{}", channel, product);
+                    // let subscribe_channel = format!("{}{}", channel, product);
                     info!(
                         "[{}] Subscribing to [{}] for product: {}", 
                         &self.exchange, 
@@ -207,11 +226,8 @@ impl AdvancedTradeWebSockets {
         }
     }
 
-    // just "finished" the above code block
-
     async fn connect(&mut self) -> Result<(WebSocket<MaybeTlsStream<TcpStream>>, Response)> {
-        let mut websocket_urls = Vec::new();
-        websocket_urls.push("wss://advanced-trade-ws.coinbase.com".to_string());
+        let websocket_urls = vec!["wss://advanced-trade-ws.coinbase.com".to_string()];
 
         if let Ok(con) = websocket::connect_wss(&self.exchange, websocket_urls) {
             return Ok(con);

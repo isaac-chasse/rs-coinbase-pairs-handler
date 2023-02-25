@@ -72,7 +72,7 @@ impl AdvancedTradeRESTClient {
             ""
         ) {
             Ok(header_map) => header_map,
-            Err(e) => {
+            Err(_) => {
                 bail!("Ill-defined headers");
             }
         };
